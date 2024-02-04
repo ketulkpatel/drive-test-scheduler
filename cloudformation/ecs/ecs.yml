@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+# Required parameters to run the stack.
+Parameters:
+  AWSAccountId:
+    Type: String
+    Description: AWS Account ID
+  SubnetID:
+    Type: String
+  PrefixName:
+    Type: String
+
+Resources:
+
+  # Creating a cluster.
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Join ["-", [!Ref PrefixName, "cluster"]]    
+  
+  # Creating a log group.
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["-", [!Ref PrefixName, "log-group"]]
+
+  # Creating a security group.
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join ["-", [!Ref PrefixName, "security", "group"]]
+      GroupDescription: Security group for container
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5173
+          ToPort: 8881
+          CidrIp: 0.0.0.0/0
+
+  # Creating a task defination.
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join ["-", [!Ref PrefixName, "task"]]
+      Cpu: 256
+      Memory: 2048
+      NetworkMode: awsvpc
+      ExecutionRoleArn: LabRole
+      ContainerDefinitions:
+        - Name: !Join ["-", [!Ref PrefixName, "container"]]
+          Image: !Join ["", [!Ref AWSAccountId, ".dkr.ecr.",!Ref 'AWS::Region','.amazonaws.com/',!Ref PrefixName, "-", "repo"]]
+          PortMappings:
+            - ContainerPort: 5173
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: ecs
+      RequiresCompatibilities:
+        - EC2
+        - FARGATE
+
+  # Creating a service.
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Join ["-", [!Ref PrefixName, "service"]] 
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetID
+          SecurityGroups:
+            - !GetAtt ContainerSecurityGroup.GroupId

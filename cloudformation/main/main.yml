@@ -1,0 +1,348 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create Elastic Container Registry(ECR), DynamoDB, Lambda, API gateway, Step function, SQS, and Secret manager.
+
+# Parameters required to create stack.
+Parameters:
+  PrefixName:
+    Type: String
+  EmailID:
+    Type: String
+  Password:
+    Type: String
+
+# Create required resources for stack.
+Resources:
+
+  # Elastic Container Repository
+  MainRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Join ["-", [!Ref PrefixName, "repo"]] 
+    
+  # PaymentInformation table.
+  PaymentInformationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PROVISIONED 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "receipt_id"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "receipt_id"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableClass: STANDARD
+      TableName: PaymentInformation
+
+  # Appointment table.
+  AppointmentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PROVISIONED 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "appointment_id"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "appointment_id"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableClass: STANDARD
+      TableName: Appointment
+
+  # Create book appointment lambda function from uploaded zip to s3 bucket.
+  BookAppointmentLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::646219003399:role/LabRole
+      Runtime: python3.9
+      Handler: book_appointment.lambda_handler
+      FunctionName: BookAppointmentLambdaFunction
+      Timeout: 900
+      Code:
+        S3Bucket: termassignment-b00900957
+        S3Key: lambda_functions.zip
+
+  # Create cancel appointment lambda function from uploaded zip to s3 bucket.
+  CancelAppointmentLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::646219003399:role/LabRole
+      Runtime: python3.9
+      Handler: cancel_appointment.lambda_handler
+      FunctionName: CancelAppointmentLambdaFunction
+      Timeout: 900
+      Code:
+        S3Bucket: termassignment-b00900957
+        S3Key: lambda_functions.zip
+
+  # Create reschedule appointment lambda function from uploaded zip to s3 bucket.
+  RescheduleAppointmentLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::646219003399:role/LabRole
+      Runtime: python3.9
+      Handler: reschedule_appointment.lambda_handler
+      FunctionName: RescheduleAppointmentLambdaFunction
+      Timeout: 900
+      Code:
+        S3Bucket: termassignment-b00900957
+        S3Key: lambda_functions.zip
+
+  # Create view appointment lambda function from uploaded zip to s3 bucket.
+  ViewAppointmentLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::646219003399:role/LabRole
+      Runtime: python3.9
+      Handler: view_appointment.lambda_handler
+      FunctionName: ViewAppointmentLambdaFunction
+      Timeout: 900
+      Code:
+        S3Bucket: termassignment-b00900957
+        S3Key: lambda_functions.zip
+
+  # Create book appointment send email lambda function from uploaded zip to s3 bucket.
+  BookAppointmentSendEmailLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::646219003399:role/LabRole
+      Runtime: python3.9
+      Handler: book_appointment_send_email.lambda_handler
+      FunctionName: BookAppointmentSendEmailLambdaFunction
+      Timeout: 900
+      Code:
+        S3Bucket: termassignment-b00900957
+        S3Key: lambda_functions.zip
+
+  # Create reschedule appointment send email lambda function from uploaded zip to s3 bucket.
+  RescheduleAppointmentSendEmailLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::646219003399:role/LabRole
+      Runtime: python3.9
+      Handler: reschedule_appointment_send_email.lambda_handler
+      FunctionName: RescheduleAppointmentSendEmailLambdaFunction
+      Timeout: 900
+      Code:
+        S3Bucket: termassignment-b00900957
+        S3Key: lambda_functions.zip
+
+  # Create cancel appointment send email lambda function from uploaded zip to s3 bucket.
+  CancelAppointmentSendEmailLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::646219003399:role/LabRole
+      Runtime: python3.9
+      Handler: cancel_appointment_send_email.lambda_handler
+      FunctionName: CancelAppointmentSendEmailLambdaFunction
+      Timeout: 900
+      Code:
+        S3Bucket: termassignment-b00900957
+        S3Key: lambda_functions.zip
+
+  # Create appointment step function from uploaded zip to s3 bucket.
+  AppointmentStepFunction:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: AppointmentStepFunction
+      StateMachineType: EXPRESS
+      DefinitionS3Location:
+        Bucket: termassignment-b00900957
+        Key: step-function.json
+      RoleArn: arn:aws:iam::646219003399:role/LabRole
+
+  # Create Cloud term assignment rest API.
+  CloudTermAssignment:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: CloudTermAssignment
+      EndpointConfiguration:
+        Types: [REGIONAL]
+
+  # Create appointment resource on created rest API.
+  AppointmentResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref CloudTermAssignment
+      ParentId: !GetAtt
+        - CloudTermAssignment
+        - RootResourceId
+      PathPart: 'appointment'
+
+  # Create post method inside created resource.
+  AppointmentMethod:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref CloudTermAssignment
+      ResourceId: !Ref AppointmentResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+          Credentials: arn:aws:iam::646219003399:role/LabRole
+          IntegrationHttpMethod: POST
+          Type: AWS
+          PassthroughBehavior: WHEN_NO_TEMPLATES
+          Uri:
+            Fn::Join:
+            - ""
+            - - "arn:aws:apigateway:"
+              - Ref: AWS::Region
+              - ":states:action/StartSyncExecution"
+          IntegrationResponses:
+            - StatusCode: '200'
+              ResponseTemplates:
+                application/json: |
+                  #set ($parsedPayload = $util.parseJson($input.json('$.output')))
+                  $parsedPayload
+              ResponseParameters:
+                method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                method.response.header.Access-Control-Allow-Methods: "'*'"
+                method.response.header.Access-Control-Allow-Origin: "'*'"
+            - StatusCode: '400'
+              SelectionPattern: "^[4]\\d{2}$"
+              ResponseTemplates:
+                application/json: |
+                  #set ($parsedPayload = $util.parseJson($input.json('$.output')))
+                  $parsedPayload
+              ResponseParameters:
+                method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                method.response.header.Access-Control-Allow-Methods: "'*'"
+                method.response.header.Access-Control-Allow-Origin: "'*'"
+            - StatusCode: '500'
+              SelectionPattern: ".*error.*"
+              ResponseTemplates:
+                application/json: |
+                  #set ($parsedPayload = $util.parseJson($input.json('$.output')))
+                  $parsedPayload
+              ResponseParameters:
+                method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                method.response.header.Access-Control-Allow-Methods: "'*'"
+                method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseModels:
+            application/json: "Empty"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'*'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        - StatusCode: '400'
+          ResponseModels:
+            application/json: "Empty"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'*'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        - StatusCode: '500'
+          ResponseModels:
+            application/json: "Empty"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+            method.response.header.Access-Control-Allow-Methods: "'*'"
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+
+  # Create options method inside created resource.
+  OptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId:
+        Ref: CloudTermAssignment
+      ResourceId:
+        Ref: AppointmentResource
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'*'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
+  # Create API gateway deployment for create Rest API.
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties: 
+      RestApiId: !Ref CloudTermAssignment
+      StageName: dev
+    DependsOn: AppointmentMethod
+      
+  # Create Secret manager to store email credentials.
+  StoreEmailCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Description: Secret manager to store credentials.
+      Name: String
+      Name: StoreEmailCredentials
+      SecretString: !Join ["", ['{"emailID": "',!Ref EmailID, '",' , '"password": "', !Ref Password, '"}']]
+
+  # Create Queue to store book appointment messages.
+  BookAppointmentMessageQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      VisibilityTimeout: 900
+      QueueName: BookAppointmentMessageQueue
+
+  # Create Queue to store reschedule appointment messages.
+  RescheduleAppointmentMessageQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      VisibilityTimeout: 900
+      QueueName: RescheduleAppointmentMessageQueue
+
+  # Create Queue to store cancel appointment messages.
+  CancelAppointmentMessageQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      VisibilityTimeout: 900
+      QueueName: CancelAppointmentMessageQueue
+
+  # Trigger book lambda as soon as message is received by book appointment Queue.
+  BookAppointmentQueueSourceMappingToTriggerLambda:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      Enabled: true
+      EventSourceArn:
+        Fn::GetAtt: [BookAppointmentMessageQueue, Arn]
+      FunctionName: !Ref BookAppointmentSendEmailLambdaFunction
+
+  # Trigger book lambda as soon as message is received by book appointment Queue.
+  RescheduleAppointmentQueueSourceMappingToTriggerLambda:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      Enabled: true
+      EventSourceArn:
+        Fn::GetAtt: [RescheduleAppointmentMessageQueue, Arn]
+      FunctionName: !Ref RescheduleAppointmentSendEmailLambdaFunction
+
+  # Trigger book lambda as soon as message is received by book appointment Queue.
+  CancelAppointmentQueueSourceMappingToTriggerLambda:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      Enabled: true
+      EventSourceArn:
+        Fn::GetAtt: [CancelAppointmentMessageQueue, Arn]
+      FunctionName: !Ref CancelAppointmentSendEmailLambdaFunction
+

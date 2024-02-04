@@ -1,0 +1,67 @@
+{
+  "PaymentInformation": [
+      {   
+          "PutRequest": {
+              "Item": { 
+                  "license_number": { "S": "WVU654" },
+                  "date_of_birth": { "S": "1992-12-15" },
+                  "receipt_id": { "S": "987654321" }
+              }
+          }
+      },
+      {   
+          "PutRequest": {
+              "Item": { 
+                  "license_number": { "S": "TSR987" },
+                  "date_of_birth": { "S": "1981-06-02" },
+                  "receipt_id": { "S": "246813579" }
+              }
+          }
+      },
+      {   
+          "PutRequest": {
+              "Item": { 
+                  "license_number": { "S": "QPO246" },
+                  "date_of_birth": { "S": "1977-09-23" },
+                  "receipt_id": { "S": "135792468" }
+              }
+          }
+      },
+      {   
+          "PutRequest": {
+              "Item": { 
+                  "license_number": { "S": "NML753" },
+                  "date_of_birth": { "S": "2001-11-12" },
+                  "receipt_id": { "S": "369258147" }
+              }
+          }
+      },
+      {   
+          "PutRequest": {
+              "Item": { 
+                  "license_number": { "S": "KJI987" },
+                  "date_of_birth": { "S": "1989-04-05" },
+                  "receipt_id": { "S": "258147369" }
+              }
+          }
+      },
+      {   
+          "PutRequest": {
+              "Item": { 
+                  "license_number": { "S": "EDC753" },
+                  "date_of_birth": { "S": "1982-02-14" },
+                  "receipt_id": { "S": "951753684" }
+              }
+          }
+      },
+      {   
+          "PutRequest": {
+              "Item": { 
+                  "license_number": { "S": "BAN432" },
+                  "date_of_birth": { "S": "1998-09-30" },
+                  "receipt_id": { "S": "123456789" }
+              }
+          }
+      }
+  ]
+}

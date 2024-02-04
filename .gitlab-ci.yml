@@ -1,0 +1,50 @@
+stages:
+  - build
+
+image: docker:19.03.10
+
+variables:
+  REPOSITORY_URL: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/main-repo
+  TASK_DEFINITION_NAME: main-task
+  CLUSTER_NAME: main-cluster
+  SERVICE_NAME: main-service
+  DOCKER_HOST: tcp://docker:2375/
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+
+services:
+  - docker:dind
+
+before_script:
+  - docker info
+  - apk add --no-cache curl jq python py-pip
+  - pip install awscli
+  - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+  - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+  - aws configure set aws_access_token $AWS_SESSION_TOKEN
+  - aws configure set region $AWS_DEFAULT_REGION
+
+
+build:
+  stage: build
+  tags:
+    - dalfcs_docker_kvm
+  script:
+      - echo "Building image..."
+      - docker build -t main-repo .
+      - echo "Tagging image..."
+      - docker tag main-repo:latest ${REPOSITORY_URL}:latest
+      - echo "authentication..."
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+      - echo "Pushing image..."
+      - docker push ${REPOSITORY_URL}:latest
+      - NEW_IMAGE=${REPOSITORY_URL}:latest
+      - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "$TASK_DEFINITION_NAME")
+      - NEW_TASK_DEFINITION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$NEW_IMAGE" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredAt) | del(.registeredBy)')
+      - NEW_REVISION=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEFINITION")
+      - NEW_REVISION_DATA=$(echo $NEW_REVISION | jq '.taskDefinition.revision')
+      - NEW_SERVICE=$(aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --task-definition $TASK_DEFINITION_NAME --force-new-deployment)
+  
+  
+  only:
+    - main
